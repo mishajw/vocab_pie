@@ -19,10 +19,12 @@ def __main():
     parser.add_argument("--file", type=str, required=True)
     parser.add_argument("--ignore-case", type=bool, default=DEFAULT_IGNORE_CASE)
     parser.add_argument("--output-file", type=str, default=DEFAULT_OUTPUT_FILE)
+    parser.add_argument("--prefix", type=str, default=None)
     args = parser.parse_args()
 
     try:
-        create_from_file(args.file)
+        create_from_file(
+            args.file, args.ignore_case, args.output_file, args.prefix)
     except VocabPieError as e:
         e.display()
 
@@ -30,7 +32,8 @@ def __main():
 def create_from_file(
         file_path: str,
         ignore_case: bool = DEFAULT_IGNORE_CASE,
-        output_file: str = DEFAULT_OUTPUT_FILE):
+        output_file: str = DEFAULT_OUTPUT_FILE,
+        prefix: str = None):
     if not os.path.isfile(file_path):
         raise VocabPieError(f"File does not exist: {file_path}")
     if not os.access(file_path, os.R_OK):
@@ -39,16 +42,22 @@ def create_from_file(
     with open(file_path, "r") as f:
         sentences = [line.strip() for line in f if line != ""]
 
-    create_from_sentences(sentences, ignore_case, output_file)
+    create_from_sentences(sentences, ignore_case, output_file, prefix)
 
 
 def create_from_sentences(
         sentences: List[str],
         ignore_case: bool = DEFAULT_IGNORE_CASE,
-        output_file: str = DEFAULT_OUTPUT_FILE):
+        output_file: str = DEFAULT_OUTPUT_FILE,
+        prefix: str = None):
     # Apply ignore case flag
     if ignore_case:
         sentences = [s.lower() for s in sentences]
+
+    # Remove all sentences not containing prefix, and remove prefix from
+    # remaining sentences
+    if prefix is not None:
+        sentences = [s[len(prefix):] for s in sentences if s.startswith(prefix)]
 
     # Create sentence hierarchy and pie chart layers
     hierarchy = Hierarchy.from_sentences(sentences)
