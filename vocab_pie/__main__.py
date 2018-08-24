@@ -2,7 +2,7 @@ import itertools
 import operator
 import os
 import sys
-from typing import List, Tuple, NamedTuple
+from typing import List, Tuple, NamedTuple, Optional
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,6 +11,7 @@ from configargparse import ArgumentParser
 DEFAULT_IGNORE_CASE = True
 DEFAULT_OUTPUT_FILE = "vocab-pie.png"
 COLOR_MAP = plt.get_cmap("tab10")
+DPI = 200
 
 
 def __main():
@@ -51,9 +52,14 @@ def create_from_sentences(
 
     # Create sentence hierarchy and pie chart layers
     hierarchy = Hierarchy.from_sentences(sentences)
+    hierarchy.remove_small_children(
+        min_percentage=0.01, label_min_percentage=0.01)
+    hierarchy.fill_depth(hierarchy.get_max_depth() - 1)
     layers = hierarchy.get_layers()
 
     figure, axes = plt.subplots()
+    figure.set_size_inches(20, 20)
+    figure.set_dpi(DPI)
     axes.axis('equal')
 
     # Calculate where the layers will start and end
@@ -65,12 +71,14 @@ def create_from_sentences(
 
     for layer, layer_start in zip(layers, layer_starting_points):
         widths = [cell.percentage for cell in layer.cells]
-        labels = [cell.label for cell in layer.cells]
+        labels = [
+            cell.label if cell.label is not None else ""
+            for cell in layer.cells]
         colors = [__get_color(cell, num_layers) for cell in layer.cells]
 
         # `matplotlib` is awful, so this is how you get the cell labels to be
         # centered...
-        label_distance = layer_start / (layer_start + (layer_width * 0.6))
+        label_distance = layer_start / (layer_start + (layer_width * 0.8))
 
         # Create the pie chart layer
         pie, texts = axes.pie(
@@ -79,18 +87,22 @@ def create_from_sentences(
             labels=labels,
             colors=colors,
             labeldistance=label_distance,
-            pctdistance=1)
+            pctdistance=1,
+            rotatelabels=True)
         plt.setp(pie, width=layer_width, edgecolor='white')
 
         # Set the font size for all labels
         for text in texts:
-            text.set_fontsize(8)
+            text.set_fontsize(layer_width * DPI / 2)
 
     figure.savefig(output_file)
 
 
 class Hierarchy:
-    def __init__(self, root: str, children: List[Tuple["Hierarchy", float]]):
+    def __init__(
+            self,
+            root: Optional[str],
+            children: List[Tuple["Hierarchy", float]]):
         self.__root = root
         self.__children = children
 
@@ -166,10 +178,56 @@ class Hierarchy:
 
         return layers
 
+    def remove_small_children(
+            self, min_percentage: float, label_min_percentage: float) -> None:
+        # Remove children below `min_percentage`
+        total_removed_percentage = 0
+
+        def filter_fn(child_tuple: Tuple["Hierarchy", float]) -> bool:
+            nonlocal total_removed_percentage
+            _, child_percentage = child_tuple
+            keep = child_percentage > min_percentage
+            if not keep:
+                total_removed_percentage += child_percentage
+            return keep
+
+        self.__children = list(filter(filter_fn, self.__children))
+
+        # Remove label if `label_min_percentage` is greater than 1
+        if label_min_percentage >= 1:
+            self.__root = ""
+
+        if total_removed_percentage != 0:
+            self.__children.append(
+                (Hierarchy(None, []), total_removed_percentage))
+
+        for child, percentage in self.__children:
+            child.remove_small_children(
+                min_percentage / percentage, label_min_percentage / percentage)
+
+    def get_max_depth(self) -> int:
+        if not self.__children:
+            return 1
+
+        return 1 + max(c.get_max_depth() for c, _ in self.__children)
+
+    def fill_depth(self, depth: int) -> None:
+        if depth <= 0:
+            return
+
+        if not self.__children:
+            self.__children.append((Hierarchy(None, []), 1))
+
+        for child, _ in self.__children:
+            child.fill_depth(depth - 1)
+
 
 def __get_color(cell: "LayerCell", max_layers: int) -> np.array:
+    if cell.label is None:
+        return np.array([1] * 3)
+
     # The first category determines the base color to use
-    base_color = np.array(COLOR_MAP(cell.color_chain[0]))
+    base_color = np.array(COLOR_MAP(cell.color_chain[0] % COLOR_MAP.N))
 
     # On a scale of 0 to 1, how "pastelly" should the color be?
 
