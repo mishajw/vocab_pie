@@ -11,6 +11,7 @@ from configargparse import ArgumentParser
 DEFAULT_IGNORE_CASE = True
 DEFAULT_OUTPUT_FILE = "vocab-pie.png"
 DEFAULT_TITLE = "Vocabulary"
+DEFAULT_MAX_LAYERS = 5
 COLOR_MAP = plt.get_cmap("tab10")
 DPI = 200
 
@@ -22,6 +23,7 @@ def __main():
     parser.add_argument("--output-file", type=str, default=DEFAULT_OUTPUT_FILE)
     parser.add_argument("--prefix", type=str, default=None)
     parser.add_argument("--title", type=str, default=DEFAULT_TITLE)
+    parser.add_argument("--max-layers", type=int, default=DEFAULT_MAX_LAYERS)
     args = parser.parse_args()
 
     try:
@@ -30,7 +32,8 @@ def __main():
             args.ignore_case,
             args.output_file,
             args.prefix,
-            args.title)
+            args.title,
+            args.max_layers)
     except VocabPieError as e:
         e.display()
 
@@ -40,7 +43,8 @@ def create_from_file(
         ignore_case: bool = DEFAULT_IGNORE_CASE,
         output_file: str = DEFAULT_OUTPUT_FILE,
         prefix: str = None,
-        title: str = DEFAULT_TITLE):
+        title: str = DEFAULT_TITLE,
+        max_layers: int = DEFAULT_MAX_LAYERS):
     if not os.path.isfile(file_path):
         raise VocabPieError(f"File does not exist: {file_path}")
     if not os.access(file_path, os.R_OK):
@@ -49,7 +53,8 @@ def create_from_file(
     with open(file_path, "r") as f:
         sentences = [line.strip() for line in f if line != ""]
 
-    create_from_sentences(sentences, ignore_case, output_file, prefix, title)
+    create_from_sentences(
+        sentences, ignore_case, output_file, prefix, title, max_layers)
 
 
 def create_from_sentences(
@@ -57,7 +62,8 @@ def create_from_sentences(
         ignore_case: bool = DEFAULT_IGNORE_CASE,
         output_file: str = DEFAULT_OUTPUT_FILE,
         prefix: str = None,
-        title: str = DEFAULT_TITLE):
+        title: str = DEFAULT_TITLE,
+        max_layers: int = DEFAULT_MAX_LAYERS):
     # Apply ignore case flag
     if ignore_case:
         sentences = [s.lower() for s in sentences]
@@ -72,6 +78,7 @@ def create_from_sentences(
     hierarchy.remove_small_children(
         min_percentage=0.01, label_min_percentage=0.01)
     hierarchy.fill_depth(hierarchy.get_max_depth() - 1)
+    hierarchy.apply_max_layers(max_layers)
     layers = hierarchy.get_layers()
 
     figure, axes = plt.subplots()
@@ -242,6 +249,12 @@ class Hierarchy:
 
         for child, _ in self.__children:
             child.fill_depth(depth - 1)
+
+    def apply_max_layers(self, max_layers: int) -> None:
+        if max_layers == 0:
+            self.__children = []
+        for child, _ in self.__children:
+            child.apply_max_layers(max_layers - 1)
 
 
 def __get_color(cell: "LayerCell", max_layers: int) -> np.array:
