@@ -10,6 +10,7 @@ from configargparse import ArgumentParser
 
 DEFAULT_IGNORE_CASE = True
 DEFAULT_OUTPUT_FILE = "vocab-pie.png"
+DEFAULT_TITLE = "Vocabulary"
 COLOR_MAP = plt.get_cmap("tab10")
 DPI = 200
 
@@ -20,11 +21,16 @@ def __main():
     parser.add_argument("--ignore-case", type=bool, default=DEFAULT_IGNORE_CASE)
     parser.add_argument("--output-file", type=str, default=DEFAULT_OUTPUT_FILE)
     parser.add_argument("--prefix", type=str, default=None)
+    parser.add_argument("--title", type=str, default=DEFAULT_TITLE)
     args = parser.parse_args()
 
     try:
         create_from_file(
-            args.file, args.ignore_case, args.output_file, args.prefix)
+            args.file,
+            args.ignore_case,
+            args.output_file,
+            args.prefix,
+            args.title)
     except VocabPieError as e:
         e.display()
 
@@ -33,7 +39,8 @@ def create_from_file(
         file_path: str,
         ignore_case: bool = DEFAULT_IGNORE_CASE,
         output_file: str = DEFAULT_OUTPUT_FILE,
-        prefix: str = None):
+        prefix: str = None,
+        title: str = DEFAULT_TITLE):
     if not os.path.isfile(file_path):
         raise VocabPieError(f"File does not exist: {file_path}")
     if not os.access(file_path, os.R_OK):
@@ -42,14 +49,15 @@ def create_from_file(
     with open(file_path, "r") as f:
         sentences = [line.strip() for line in f if line != ""]
 
-    create_from_sentences(sentences, ignore_case, output_file, prefix)
+    create_from_sentences(sentences, ignore_case, output_file, prefix, title)
 
 
 def create_from_sentences(
         sentences: List[str],
         ignore_case: bool = DEFAULT_IGNORE_CASE,
         output_file: str = DEFAULT_OUTPUT_FILE,
-        prefix: str = None):
+        prefix: str = None,
+        title: str = DEFAULT_TITLE):
     # Apply ignore case flag
     if ignore_case:
         sentences = [s.lower() for s in sentences]
@@ -104,6 +112,11 @@ def create_from_sentences(
         for text in texts:
             text.set_fontsize(layer_width * DPI / 2)
 
+    axes.set_title(
+        title if prefix is None
+        else f"{title}, sentences prefixed by \"{prefix}\"",
+        fontsize=DPI * 0.3,
+        pad=DPI * 0.75)
     figure.savefig(output_file)
 
 
