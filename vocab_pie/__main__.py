@@ -14,6 +14,7 @@ DEFAULT_TITLE = "Vocabulary"
 DEFAULT_MAX_LAYERS = 5
 DEFAULT_MIN_DISPLAY_PERCENTAGE = 0.01
 DEFAULT_MIN_LABEL_PERCENTAGE = 0.01
+DEFAULT_LABEL_FONT_SIZE = 10
 COLOR_MAP = plt.get_cmap("tab10")
 DPI = 200
 
@@ -34,6 +35,8 @@ def __main():
         "--min-label-percentage",
         type=float,
         default=DEFAULT_MIN_LABEL_PERCENTAGE)
+    parser.add_argument(
+        "--label-font-size", type=int, default=DEFAULT_LABEL_FONT_SIZE)
     args = parser.parse_args()
 
     try:
@@ -45,7 +48,8 @@ def __main():
             args.title,
             args.max_layers,
             args.min_display_percentage,
-            args.min_label_percentage, )
+            args.min_label_percentage,
+            args.label_font_size)
     except VocabPieError as e:
         e.display()
 
@@ -58,7 +62,8 @@ def create_from_file(
         title: str = DEFAULT_TITLE,
         max_layers: int = DEFAULT_MAX_LAYERS,
         min_display_percentage: float = DEFAULT_MIN_DISPLAY_PERCENTAGE,
-        min_label_percentage: float = DEFAULT_MIN_LABEL_PERCENTAGE):
+        min_label_percentage: float = DEFAULT_MIN_LABEL_PERCENTAGE,
+        label_font_size: int = DEFAULT_LABEL_FONT_SIZE):
     if not os.path.isfile(file_path):
         raise VocabPieError(f"File does not exist: {file_path}")
     if not os.access(file_path, os.R_OK):
@@ -69,7 +74,7 @@ def create_from_file(
 
     create_from_sentences(
         sentences, ignore_case, output_file, prefix, title, max_layers,
-        min_display_percentage, min_label_percentage)
+        min_display_percentage, min_label_percentage, label_font_size)
 
 
 def create_from_sentences(
@@ -80,7 +85,8 @@ def create_from_sentences(
         title: str = DEFAULT_TITLE,
         max_layers: int = DEFAULT_MAX_LAYERS,
         min_display_percentage: float = DEFAULT_MIN_DISPLAY_PERCENTAGE,
-        min_label_percentage: float = DEFAULT_MIN_LABEL_PERCENTAGE):
+        min_label_percentage: float = DEFAULT_MIN_LABEL_PERCENTAGE,
+        label_font_size: int = DEFAULT_LABEL_FONT_SIZE):
     # Apply ignore case flag
     if ignore_case:
         sentences = [s.lower() for s in sentences]
@@ -134,7 +140,7 @@ def create_from_sentences(
 
         # Set the font size for all labels
         for text in texts:
-            text.set_fontsize(layer_width * DPI / 2)
+            text.set_fontsize(label_font_size * DPI / 100)
 
     axes.set_title(
         title if prefix is None
