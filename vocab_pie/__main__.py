@@ -16,7 +16,7 @@ DEFAULT_MIN_DISPLAY_PERCENTAGE = 0.01
 DEFAULT_MIN_LABEL_PERCENTAGE = 0.01
 DEFAULT_LABEL_FONT_SIZE = 10
 COLOR_MAP = plt.get_cmap("tab10")
-DPI = 200
+DPI = 100
 
 
 def __main():
@@ -110,7 +110,7 @@ def create_from_sentences(
     axes.axis('equal')
 
     # Calculate where the layers will start and end
-    radius_start, radius_end = 0.2, 1.0
+    radius_start, radius_end = 0.1, 1.5
     num_layers = len(layers)
     layer_width = (radius_end - radius_start) / num_layers
     layer_starting_points = np.arange(
