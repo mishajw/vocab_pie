@@ -12,6 +12,8 @@ DEFAULT_IGNORE_CASE = True
 DEFAULT_OUTPUT_FILE = "vocab-pie.png"
 DEFAULT_TITLE = "Vocabulary"
 DEFAULT_MAX_LAYERS = 5
+DEFAULT_MIN_DISPLAY_PERCENTAGE = 0.01
+DEFAULT_MIN_LABEL_PERCENTAGE = 0.01
 COLOR_MAP = plt.get_cmap("tab10")
 DPI = 200
 
@@ -24,6 +26,14 @@ def __main():
     parser.add_argument("--prefix", type=str, default=None)
     parser.add_argument("--title", type=str, default=DEFAULT_TITLE)
     parser.add_argument("--max-layers", type=int, default=DEFAULT_MAX_LAYERS)
+    parser.add_argument(
+        "--min-display-percentage",
+        type=float,
+        default=DEFAULT_MIN_DISPLAY_PERCENTAGE)
+    parser.add_argument(
+        "--min-label-percentage",
+        type=float,
+        default=DEFAULT_MIN_LABEL_PERCENTAGE)
     args = parser.parse_args()
 
     try:
@@ -33,7 +43,9 @@ def __main():
             args.output_file,
             args.prefix,
             args.title,
-            args.max_layers)
+            args.max_layers,
+            args.min_display_percentage,
+            args.min_label_percentage, )
     except VocabPieError as e:
         e.display()
 
@@ -44,7 +56,9 @@ def create_from_file(
         output_file: str = DEFAULT_OUTPUT_FILE,
         prefix: str = None,
         title: str = DEFAULT_TITLE,
-        max_layers: int = DEFAULT_MAX_LAYERS):
+        max_layers: int = DEFAULT_MAX_LAYERS,
+        min_display_percentage: float = DEFAULT_MIN_DISPLAY_PERCENTAGE,
+        min_label_percentage: float = DEFAULT_MIN_LABEL_PERCENTAGE):
     if not os.path.isfile(file_path):
         raise VocabPieError(f"File does not exist: {file_path}")
     if not os.access(file_path, os.R_OK):
@@ -54,7 +68,8 @@ def create_from_file(
         sentences = [line.strip() for line in f if line != ""]
 
     create_from_sentences(
-        sentences, ignore_case, output_file, prefix, title, max_layers)
+        sentences, ignore_case, output_file, prefix, title, max_layers,
+        min_display_percentage, min_label_percentage)
 
 
 def create_from_sentences(
@@ -63,7 +78,9 @@ def create_from_sentences(
         output_file: str = DEFAULT_OUTPUT_FILE,
         prefix: str = None,
         title: str = DEFAULT_TITLE,
-        max_layers: int = DEFAULT_MAX_LAYERS):
+        max_layers: int = DEFAULT_MAX_LAYERS,
+        min_display_percentage: float = DEFAULT_MIN_DISPLAY_PERCENTAGE,
+        min_label_percentage: float = DEFAULT_MIN_LABEL_PERCENTAGE):
     # Apply ignore case flag
     if ignore_case:
         sentences = [s.lower() for s in sentences]
@@ -75,8 +92,8 @@ def create_from_sentences(
 
     # Create sentence hierarchy and pie chart layers
     hierarchy = Hierarchy.from_sentences(sentences)
-    hierarchy.remove_small_children(
-        min_percentage=0.01, label_min_percentage=0.01)
+    hierarchy.apply_min_percentages(
+        min_display_percentage, min_label_percentage)
     hierarchy.fill_depth(hierarchy.get_max_depth() - 1)
     hierarchy.apply_max_layers(max_layers)
     layers = hierarchy.get_layers()
@@ -207,15 +224,17 @@ class Hierarchy:
 
         return layers
 
-    def remove_small_children(
-            self, min_percentage: float, label_min_percentage: float) -> None:
+    def apply_min_percentages(
+            self,
+            min_display_percentage: float,
+            min_label_percentage: float) -> None:
         # Remove children below `min_percentage`
         total_removed_percentage = 0
 
         def filter_fn(child_tuple: Tuple["Hierarchy", float]) -> bool:
             nonlocal total_removed_percentage
             _, child_percentage = child_tuple
-            keep = child_percentage > min_percentage
+            keep = child_percentage > min_display_percentage
             if not keep:
                 total_removed_percentage += child_percentage
             return keep
@@ -223,7 +242,7 @@ class Hierarchy:
         self.__children = list(filter(filter_fn, self.__children))
 
         # Remove label if `label_min_percentage` is greater than 1
-        if label_min_percentage >= 1:
+        if min_label_percentage >= 1:
             self.__root = ""
 
         if total_removed_percentage != 0:
@@ -231,8 +250,9 @@ class Hierarchy:
                 (Hierarchy(None, []), total_removed_percentage))
 
         for child, percentage in self.__children:
-            child.remove_small_children(
-                min_percentage / percentage, label_min_percentage / percentage)
+            child.apply_min_percentages(
+                min_display_percentage / percentage,
+                min_label_percentage / percentage)
 
     def get_max_depth(self) -> int:
         if not self.__children:
