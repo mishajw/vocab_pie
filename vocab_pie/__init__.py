@@ -1,1 +1,1 @@
-from vocab_pie.__main__ import create_from_sentences, create_from_file
+from vocab_pie.creator import create_from_file, create_from_sentences
