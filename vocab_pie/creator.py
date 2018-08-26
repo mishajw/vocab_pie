@@ -2,6 +2,7 @@ import itertools
 import operator
 import os
 import sys
+import hashlib
 from typing import List, Tuple, NamedTuple, Optional
 
 import matplotlib.pyplot as plt
@@ -14,7 +15,7 @@ DEFAULT_MAX_LAYERS = 5
 DEFAULT_MIN_DISPLAY_PERCENTAGE = 0.01
 DEFAULT_MIN_LABEL_PERCENTAGE = 0.01
 DEFAULT_LABEL_FONT_SIZE = 10
-COLOR_MAP = plt.get_cmap("tab10")
+COLOR_MAP = plt.get_cmap("tab20")
 DPI = 100
 
 
@@ -172,7 +173,8 @@ class Hierarchy:
         layers: List["Layer"] = [Layer([])]
         for i, (child, percentage) in enumerate(self.__children):
             # Add a cell for this child
-            layers[0].cells.append(LayerCell(child.__root, percentage, [i]))
+            child_cell = LayerCell(child.__root, percentage, [], i)
+            layers[0].cells.append(child_cell)
 
             # Get the child's layers, and modify them to fit with the rest of
             # the layers
@@ -184,7 +186,7 @@ class Hierarchy:
                     cell.percentage *= percentage
                     # Add the child's color index to the child's layer's color
                     # chain
-                    cell.color_chain.insert(0, i)
+                    cell.parents.insert(0, child_cell)
 
             # Add to our layers
             for j, layer in enumerate(child_layers):
@@ -251,16 +253,20 @@ def __get_color(cell: "LayerCell", max_layers: int) -> np.array:
     if cell.label is None:
         return np.array([1] * 3)
 
+    # Get the highest parent cell
+    root_cell = cell.parents[0] if cell.parents else cell
+
     # The first category determines the base color to use
-    base_color = np.array(COLOR_MAP(cell.color_chain[0] % COLOR_MAP.N))
+    root_label_hash = int(hashlib.md5(root_cell.label.encode()).hexdigest(), 16)
+    base_color = np.array(COLOR_MAP(root_label_hash % COLOR_MAP.N))
 
     # On a scale of 0 to 1, how "pastelly" should the color be?
 
     # Colors become more "pastelly" as they go to outer layers
-    layer_pastel_scale = (len(cell.color_chain) - 1) / max_layers
+    layer_pastel_scale = len(cell.parents) / max_layers
 
     # Colors become more "pastelly" as they go across a layer inside a segment
-    segment_pastel_scale = min(cell.color_chain[-1] / 3, 1)
+    segment_pastel_scale = min(cell.index / 3, 1)
 
     # The final pastel scale is the layer scale, with the segment scale added on
     # but never exceeding the next layer's scale
@@ -275,10 +281,16 @@ def __get_color(cell: "LayerCell", max_layers: int) -> np.array:
 
 
 class LayerCell:
-    def __init__(self, label: str, percentage: float, color_chain: List[int]):
+    def __init__(
+            self,
+            label: str,
+            percentage: float,
+            parents: List["LayerCell"],
+            index: int):
         self.label = label
         self.percentage = percentage
-        self.color_chain = color_chain
+        self.parents = parents
+        self.index = index
 
 
 class Layer(NamedTuple):
